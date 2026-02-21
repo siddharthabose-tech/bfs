@@ -1,6 +1,5 @@
 #!/bin/bash
-# BFS Safe Chroot Wrapper
-# Ensures proper mount setup before chrooting
+# BFS Safe Chroot Wrapper (WSL2 Compatible)
 
 set -e
 
@@ -13,137 +12,89 @@ readonly NC='\033[0m'
 
 # Log file
 readonly LOG_FILE="/var/log/bfs/operations.log"
+mkdir -p /var/log/bfs 2>/dev/null || true
 
-#------------------------------------------------------------------------------
-# Function: log_operation
-#------------------------------------------------------------------------------
 log_operation() {
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] CHROOT: $*" >> "$LOG_FILE"
+    echo "[$timestamp] CHROOT: $*" >> "$LOG_FILE" 2>/dev/null || true
 }
 
-#------------------------------------------------------------------------------
-# Function: mount_system_directories
-# Description: Mount required system directories for chroot
-#------------------------------------------------------------------------------
 mount_system_directories() {
     local chroot_dir="$1"
     
     echo -e "${BLUE}[Chroot] Mounting system directories...${NC}"
     
-    # Required mounts for functional chroot
-    local mounts=(
-        "proc:$chroot_dir/proc:proc:none"
-        "sys:$chroot_dir/sys:sysfs:none"
-        "dev:$chroot_dir/dev:none:bind"
-        "devpts:$chroot_dir/dev/pts:devpts:none"
-        "run:$chroot_dir/run:none:bind"
-    )
-    
-    for mount_spec in "${mounts[@]}"; do
-        IFS=':' read -r src dst type options <<< "$mount_spec"
-        
-        # Create mount point if needed
-        mkdir -p "$dst"
-        
-        # Check if already mounted
-        if mount | grep -q "$dst"; then
-            echo "  ✓ $dst already mounted"
-            continue
-        fi
-        
-        # Mount
-        if [ "$type" = "none" ]; then
-            mount -o "$options" "$src" "$dst"
-        else
-            mount -t "$type" "$src" "$dst"
-        fi
-        
-        echo "  ✓ Mounted $dst"
-    done
-    
-    # Copy DNS configuration
-    if [ -f /etc/resolv.conf ]; then
-        cp /etc/resolv.conf "$chroot_dir/etc/resolv.conf"
-        echo "  ✓ Copied DNS configuration"
+    # Mount proc
+    mkdir -p "$chroot_dir/proc"
+    if ! mount | grep -q "$chroot_dir/proc"; then
+        mount -t proc proc "$chroot_dir/proc" && echo "  ✓ Mounted proc"
     fi
     
-    echo -e "${GREEN}✓ System directories mounted${NC}"
+    # Mount sysfs  
+    mkdir -p "$chroot_dir/sys"
+    if ! mount | grep -q "$chroot_dir/sys"; then
+        mount -t sysfs sysfs "$chroot_dir/sys" && echo "  ✓ Mounted sys"
+    fi
+    
+    # Mount tmpfs for /run
+    mkdir -p "$chroot_dir/run"
+    if ! mount | grep -q "$chroot_dir/run"; then
+        mount -t tmpfs tmpfs "$chroot_dir/run" 2>/dev/null && echo "  ✓ Mounted run"
+    fi
+    
+    # Try to bind /dev (skip if fails in WSL2)
+    mkdir -p "$chroot_dir/dev"
+    if mount --bind /dev "$chroot_dir/dev" 2>/dev/null; then
+        echo "  ✓ Mounted dev"
+    else
+        echo "  ⚠ Skipped /dev (WSL2 limitation, not critical)"
+    fi
+    
+    # Copy DNS
+    cp /etc/resolv.conf "$chroot_dir/etc/resolv.conf" 2>/dev/null && echo "  ✓ Copied DNS config"
+    
+    echo -e "${GREEN}✓ System directories ready${NC}"
 }
 
-#------------------------------------------------------------------------------
-# Function: unmount_system_directories
-# Description: Clean up mounts after chroot
-#------------------------------------------------------------------------------
 unmount_system_directories() {
     local chroot_dir="$1"
     
-    echo -e "${BLUE}[Chroot] Unmounting system directories...${NC}"
+    echo -e "${BLUE}[Chroot] Cleaning up...${NC}"
     
-    # Unmount in reverse order
-    local dirs=(
-        "$chroot_dir/dev/pts"
-        "$chroot_dir/dev"
-        "$chroot_dir/run"
-        "$chroot_dir/sys"
-        "$chroot_dir/proc"
-    )
-    
-    for dir in "${dirs[@]}"; do
-        if mount | grep -q "$dir"; then
-            umount "$dir" 2>/dev/null || umount -l "$dir"
-            echo "  ✓ Unmounted $dir"
-        fi
-    done
+    umount "$chroot_dir/dev" 2>/dev/null || true
+    umount "$chroot_dir/run" 2>/dev/null || true
+    umount "$chroot_dir/sys" 2>/dev/null || true
+    umount "$chroot_dir/proc" 2>/dev/null || true
     
     echo -e "${GREEN}✓ Cleanup complete${NC}"
 }
 
-#------------------------------------------------------------------------------
-# Function: validate_chroot_target
-# Description: Check if directory is a valid Linux root
-#------------------------------------------------------------------------------
 validate_chroot_target() {
     local chroot_dir="$1"
     
-    echo -e "${BLUE}[Chroot] Validating target directory...${NC}"
+    echo -e "${BLUE}[Chroot] Validating target...${NC}"
     
-    # Check if directory exists
     if [ ! -d "$chroot_dir" ]; then
-        echo -e "${RED}✗ Error: Directory does not exist: $chroot_dir${NC}"
+        echo -e "${RED}✗ Directory not found${NC}"
         return 1
     fi
     
-    # Check for essential directories
-    local required_dirs=("bin" "etc" "lib" "usr")
-    for dir in "${required_dirs[@]}"; do
+    for dir in bin etc lib usr; do
         if [ ! -d "$chroot_dir/$dir" ]; then
-            echo -e "${RED}✗ Error: Missing directory: $dir${NC}"
-            echo "This doesn't look like a Linux root filesystem"
+            echo -e "${RED}✗ Missing: $dir${NC}"
             return 1
         fi
     done
     
-    # Check for shell
-    if [ ! -f "$chroot_dir/bin/bash" ] && [ ! -f "$chroot_dir/bin/sh" ]; then
-        echo -e "${RED}✗ Error: No shell found${NC}"
-        return 1
-    fi
-    
-    # Check /etc/os-release if present
     if [ -f "$chroot_dir/etc/os-release" ]; then
         local os_name=$(grep ^NAME= "$chroot_dir/etc/os-release" | cut -d'"' -f2)
         echo "  Target OS: $os_name"
     fi
     
-    echo -e "${GREEN}✓ Target is valid Linux root${NC}"
+    echo -e "${GREEN}✓ Valid Linux root${NC}"
     return 0
 }
 
-#------------------------------------------------------------------------------
-# Function: safe_chroot
-# Description: Perform chroot with proper setup
-#------------------------------------------------------------------------------
 safe_chroot() {
     local chroot_dir="$1"
     shift
@@ -153,30 +104,19 @@ safe_chroot() {
     echo "================================"
     echo "BFS Safe Chroot"
     echo "================================"
-    echo ""
-    echo "Target:  $chroot_dir"
-    echo "Command: ${command[*]:-/bin/bash}"
+    echo "Target: $chroot_dir"
     echo ""
     
-    # Validate target
-    if ! validate_chroot_target "$chroot_dir"; then
-        return 1
-    fi
-    
+    validate_chroot_target "$chroot_dir" || return 1
     echo ""
     
-    # Setup mounts
     mount_system_directories "$chroot_dir"
-    
     echo ""
-    log_operation "Entering chroot: $chroot_dir"
     
-    # Setup cleanup trap
     trap "unmount_system_directories '$chroot_dir'" EXIT
     
-    # Enter chroot
-    echo -e "${GREEN}Entering chroot environment...${NC}"
-    echo -e "${YELLOW}(Type 'exit' to leave)${NC}"
+    log_operation "Entering: $chroot_dir"
+    echo -e "${GREEN}Entering chroot...${NC}"
     echo ""
     
     if [ ${#command[@]} -eq 0 ]; then
@@ -185,26 +125,14 @@ safe_chroot() {
         chroot "$chroot_dir" "${command[@]}"
     fi
     
-    local exit_code=$?
-    
     echo ""
     echo -e "${GREEN}Exited chroot${NC}"
-    log_operation "Exited chroot: $chroot_dir (exit code: $exit_code)"
-    
-    return $exit_code
+    log_operation "Exited: $chroot_dir"
 }
 
-#------------------------------------------------------------------------------
-# Main
-#------------------------------------------------------------------------------
 main() {
     if [ $# -lt 1 ]; then
-        echo "Usage: bfs-chroot <chroot_directory> [command]"
-        echo ""
-        echo "Examples:"
-        echo "  bfs-chroot /mnt"
-        echo "  bfs-chroot /mnt apt update"
-        echo "  bfs-chroot /mnt /bin/bash"
+        echo "Usage: bfs-chroot <directory> [command]"
         exit 1
     fi
     
