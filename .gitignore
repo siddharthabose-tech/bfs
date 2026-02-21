@@ -1,0 +1,24 @@
+# Build artifacts
+artifacts/
+*.iso
+*.squashfs
+bfs-root/
+
+# Python
+*.pyc
+__pycache__/
+
+# Editor temporary files
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large files
+data/wikis/*.zim
+
+# Logs
+*.log
