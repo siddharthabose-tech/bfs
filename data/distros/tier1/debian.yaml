@@ -1,0 +1,27 @@
+id: debian
+display_name: "Debian"
+family: debian
+
+detection:
+  os_release:
+    ID: debian
+  fingerprints:
+    - path: /etc/debian_version
+      type: file
+      
+known_versions:
+  - "11"  # Bullseye
+  - "12"  # Bookworm
+  - "13"  # Trixie (testing)
+
+boot:
+  bootloader: grub2
+  esp_mount: /boot/efi
+  
+filesystem:
+  default: ext4
+  
+packages:
+  kernel: linux-image-amd64
+  grub_efi: grub-efi-amd64
+  grub_pc: grub-pc

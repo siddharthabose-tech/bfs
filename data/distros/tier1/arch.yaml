@@ -1,0 +1,40 @@
+id: arch
+display_name: "Arch Linux"
+family: arch
+
+detection:
+  os_release:
+    ID: arch
+  fingerprints:
+    - path: /etc/arch-release
+      type: file
+    - path: /etc/pacman.conf
+      type: file
+    - path: /etc/pacman.d
+      type: directory
+      
+boot:
+  bootloader: systemd-boot
+  alternatives: [grub2, refind, efistub]
+  esp_mount: /boot
+  
+filesystem:
+  default: ext4
+  btrfs_common: true
+  subvolume_layout: ["@", "@home", "@snapshots"]
+  
+packages:
+  kernel: linux
+  grub: grub
+  
+network:
+  tool: networkmanager
+  fallback: systemd-networkd
+  
+common_issues:
+  - id: systemd_boot_missing
+    symptom: "no boot menu"
+    fix: systemd_boot_reinstall
+  - id: kernel_missing
+    symptom: "kernel panic"
+    fix: kernel_reinstall_arch

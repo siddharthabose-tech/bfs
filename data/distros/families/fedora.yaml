@@ -1,0 +1,23 @@
+family: fedora
+display_name: "Fedora-based"
+
+package_manager:
+  name: dnf
+  install: "dnf install -y"
+  update: "dnf check-update"
+  upgrade: "dnf upgrade -y"
+  
+boot:
+  default_bootloader: grub2
+  grub_config: /etc/default/grub
+  grub_update: "grub2-mkconfig -o /boot/grub2/grub.cfg"
+  grub_install: grub2-install
+  
+filesystem:
+  default: ext4
+  supports: [ext4, btrfs, xfs]
+  
+config:
+  fstab: /etc/fstab
+  hostname: /etc/hostname
+  hosts: /etc/hosts

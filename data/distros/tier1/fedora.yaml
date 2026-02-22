@@ -1,0 +1,31 @@
+id: fedora
+display_name: "Fedora"
+family: fedora
+
+detection:
+  os_release:
+    ID: fedora
+  fingerprints:
+    - path: /etc/fedora-release
+      type: file
+      
+known_versions:
+  - "38"
+  - "39"
+  - "40"
+
+boot:
+  bootloader: grub2
+  esp_mount: /boot/efi
+  grub_config: /boot/grub2/grub.cfg
+  
+filesystem:
+  default: btrfs
+  subvolume_layout: ["root", "home"]
+  
+packages:
+  kernel: kernel
+  grub_efi: grub2-efi-x64
+  
+network:
+  tool: networkmanager

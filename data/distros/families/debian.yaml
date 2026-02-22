@@ -1,0 +1,23 @@
+family: debian
+display_name: "Debian-based"
+
+package_manager:
+  name: apt
+  install: "apt install -y"
+  update: "apt update"
+  upgrade: "apt upgrade -y"
+  
+boot:
+  default_bootloader: grub2
+  grub_config: /etc/default/grub
+  grub_update: update-grub
+  grub_install: grub-install
+  
+filesystem:
+  default: ext4
+  supports: [ext4, btrfs, xfs]
+  
+config:
+  fstab: /etc/fstab
+  hostname: /etc/hostname
+  hosts: /etc/hosts

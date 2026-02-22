@@ -1,0 +1,24 @@
+family: arch
+display_name: "Arch-based"
+
+package_manager:
+  name: pacman
+  install: "pacman -S --noconfirm"
+  update: "pacman -Sy"
+  upgrade: "pacman -Syu --noconfirm"
+  
+boot:
+  default_bootloader: systemd-boot
+  alternatives: [grub2, refind]
+  grub_config: /etc/default/grub
+  grub_update: "grub-mkconfig -o /boot/grub/grub.cfg"
+  grub_install: grub-install
+  
+filesystem:
+  default: ext4
+  supports: [ext4, btrfs, xfs, f2fs]
+  
+config:
+  fstab: /etc/fstab
+  hostname: /etc/hostname
+  hosts: /etc/hosts

@@ -1,0 +1,43 @@
+id: ubuntu
+display_name: "Ubuntu"
+family: debian
+
+detection:
+  os_release:
+    ID: ubuntu
+    ID_LIKE: debian
+  fingerprints:
+    - path: /etc/lsb-release
+      contains: "Ubuntu"
+    - path: /snap
+      type: directory
+      
+known_versions:
+  - "20.04"  # Focal
+  - "22.04"  # Jammy
+  - "23.10"  # Mantic
+  - "24.04"  # Noble (LTS)
+
+boot:
+  bootloader: grub2
+  esp_mount: /boot/efi
+  
+filesystem:
+  default: ext4
+  
+packages:
+  kernel: linux-image-generic
+  grub_efi: grub-efi-amd64
+  grub_pc: grub-pc
+  
+network:
+  tool: netplan
+  config_path: /etc/netplan/
+
+common_issues:
+  - id: grub_efi_missing
+    symptom: "grub rescue prompt"
+    fix: grub_uefi_repair
+  - id: initramfs_corrupt
+    symptom: "initramfs error on boot"
+    fix: initramfs_rebuild

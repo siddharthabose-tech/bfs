@@ -1,0 +1,37 @@
+id: linuxmint
+display_name: "Linux Mint"
+family: debian
+
+detection:
+  os_release:
+    ID: linuxmint
+    ID_LIKE: ubuntu
+  fingerprints:
+    - path: /etc/linuxmint/info
+      type: file
+      
+known_versions:
+  - "21"    # Based on Ubuntu 22.04
+  - "21.1"
+  - "21.2"
+  - "21.3"
+
+boot:
+  bootloader: grub2
+  esp_mount: /boot/efi
+  
+filesystem:
+  default: ext4
+  supports_timeshift: true
+  
+packages:
+  kernel: linux-image-generic
+  grub_efi: grub-efi-amd64
+  
+network:
+  tool: network-manager
+  
+common_issues:
+  - id: timeshift_snapshot_boot
+    symptom: "boot from snapshot fails"
+    fix: grub_update
